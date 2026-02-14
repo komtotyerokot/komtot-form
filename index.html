@@ -139,28 +139,19 @@ button {
   line-height: 1.2;
 }
 
-    /* Date picker - keep native picker but show dd/mm/yyyy text */
-    .datewrap { position: absolute; }
-	.datewrap input[type="date"] {
-    position: relative;
-    z-index: 10;
-    font-size: 16px;
+#date { 
+  cursor: pointer;
+  pointer-events: none;   /* שהלחיצה תעבור לשכבה מעל */
 }
 
-    #date { cursor: pointer; }
-    #datePicker {
-      position: absolute;
-      inset: 0;
-      opacity: 0;
-      pointer-events: none;
-    }
-.field textarea {
-      resize: none;
-    }
-    .field input:focus, .field textarea:focus {
-      border-color: var(--green);
-      box-shadow: 0 0 0 3px rgba(27,107,58,.12);
-    }
+#datePicker {
+  position: absolute;
+  inset: 0;
+  opacity: 0;             /* נשאר שקוף */
+  pointer-events: auto;   /* חשוב - מאפשר לחיצה באייפון */
+  z-index: 50;            /* מעל הכל */
+}
+
 
     /* Make inputs blend nicely on top of underline */
     .field.slim input {
@@ -567,7 +558,7 @@ function createPdfOverlay(paperEl){
     d.style.fontFamily = cs.fontFamily;
     d.style.fontSize = cs.fontSize;
     d.style.fontWeight = cs.fontWeight;
-    d.style.lineHeight = rect.height + 'px';
+    d.style.lineHeight = cs.lineHeight !== 'normal' ? cs.lineHeight : cs.fontSize;
     d.style.color = cs.color;
 
     d.style.direction = 'rtl';
@@ -695,109 +686,91 @@ window.addEventListener('pageshow', ()=>{ try{ restoreDraft(); }catch(e){} });
 // ===================================================================
 
 async function makePdfBlob() {
-    // Validate first
     if (!validateForm()) return null;
 
     setStatus("מכין PDF...", true);
 
-    // Render the form area as an image (includes signature canvas and typed fields)
     const paper = document.getElementById('paperInner');
 
-    let canvasShot;
-// Hide buttons before capture
-const hideEl = document.getElementById("actionsInPaper");
-if (hideEl) {
-  hideEl.style.display = "none";
-}
-
-// Wait a moment for rendering
-await new Promise(resolve => setTimeout(resolve, 100));
-    
-    // Wait a moment for rendering
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
+    // ✅ תיקון 3: שמור dataURL של החתימה לפני כל שינוי
+    let sigDataUrl = null;
     try {
-      // Mobile-safe: keep borders, burn text, and capture signature reliably
-      const cleanupOverlay = createPdfOverlay(paper);
-      try {
-        const dpr = Math.max(window.devicePixelRatio || 1, 1);
-        canvasShot = await html2canvas(paper, {
-          scale: Math.max(3, Math.ceil(dpr * 2)),
-          useCORS: true,
-          backgroundColor: '#ffffff',
-          logging: false,
-          allowTaint: true,
-          foreignObjectRendering: false,
-          onclone: (clonedDoc) => {
-            // Signature as image in clone (extra reliability)
-            try {
-              const cSig = clonedDoc.getElementById('sig');
-              if (cSig && window.signaturePad && !signaturePad.isEmpty()) {
-                const dataUrl = signaturePad.toDataURL('image/jpeg', 0.8);
-                const img = clonedDoc.createElement('img');
-                img.src = dataUrl;
-                img.alt = 'signature';
-                img.style.width = '100%';
-                img.style.height = '100%';
-                img.style.display = 'block';
-                cSig.replaceWith(img);
-              }
-            } catch(e) {}
-            const cHide = clonedDoc.getElementById('actionsInPaper');
-            if (cHide) cHide.style.display = 'none';
-            const cDatePicker = clonedDoc.getElementById('datePicker');
-            if (cDatePicker) cDatePicker.style.display = 'none';
-            const cDateIso = clonedDoc.getElementById('dateIso');
-            if (cDateIso) cDateIso.style.display = 'none';
-          }
-        });
-      } finally {
-        cleanupOverlay();
-      }
-} finally {
-  // Show buttons again
-  if (hideEl) {
-    hideEl.style.display = "flex";
-  }
-}
+        if (window.signaturePad && signaturePad && !signaturePad.isEmpty()) {
+            sigDataUrl = signaturePad.toDataURL('image/jpeg', 0.85);
+        }
+    } catch(e) {}
+
+    let canvasShot;
+    const hideEl = document.getElementById("actionsInPaper");
+    if (hideEl) hideEl.style.display = "none";
+
+    await new Promise(resolve => setTimeout(resolve, 150));
+
+    try {
+        const cleanupOverlay = createPdfOverlay(paper);
+        try {
+            canvasShot = await html2canvas(paper, {
+                scale: 2,  // ✅ תיקון 1: קבוע במקום חישוב שגורם טשטוש
+                useCORS: true,
+                backgroundColor: '#ffffff',
+                logging: false,
+                allowTaint: true,
+                foreignObjectRendering: false,
+                onclone: (clonedDoc) => {
+                    // ✅ תיקון 3: השתמש ב-sigDataUrl שנשמר מראש
+                    try {
+                        const cSig = clonedDoc.getElementById('sig');
+                        if (cSig && sigDataUrl) {
+                            const img = clonedDoc.createElement('img');
+                            img.src = sigDataUrl;
+                            img.alt = 'signature';
+                            img.style.width = '100%';
+                            img.style.height = '100%';
+                            img.style.display = 'block';
+                            img.style.objectFit = 'contain';
+                            cSig.replaceWith(img);
+                        }
+                    } catch(e) {}
+
+                    const cHide = clonedDoc.getElementById('actionsInPaper');
+                    if (cHide) cHide.style.display = 'none';
+                    const cDatePicker = clonedDoc.getElementById('datePicker');
+                    if (cDatePicker) cDatePicker.style.display = 'none';
+                    const cDateIso = clonedDoc.getElementById('dateIso');
+                    if (cDateIso) cDateIso.style.display = 'none';
+                }
+            });
+        } finally {
+            cleanupOverlay();
+        }
+    } finally {
+        if (hideEl) hideEl.style.display = "flex";
+    }
 
     const imgData = canvasShot.toDataURL('image/png');
-
-
     const { jsPDF } = window.jspdf;
-    // A4 portrait in mm
-    const pdf = new jsPDF({orientation: "p",
-      unit: "mm",
-      format: "a4", compress: true});
+    const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4", compress: true });
 
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-
-    // Fit image to A4
     const imgProps = pdf.getImageProperties(imgData);
-const imgW = pageWidth;
-const imgH = (imgProps.height * imgW) / imgProps.width;
 
-let x = 0;
-let y = 0;
-let w = imgW;
-let h = imgH;
+    const imgW = pageWidth;
+    const imgH = (imgProps.height * imgW) / imgProps.width;
 
-// אם הגובה יוצא יותר מהעמוד - נתאים לפי גובה
-if (h > pageHeight) {
-  h = pageHeight;
-  w = (imgProps.width * h) / imgProps.height;
-  x = (pageWidth - w) / 2;
-} else {
-  y = (pageHeight - h) / 2;
+    let x = 0, y = 0, w = imgW, h = imgH;
+
+    if (h > pageHeight) {
+        h = pageHeight;
+        w = (imgProps.width * h) / imgProps.height;
+        x = (pageWidth - w) / 2;
+    } else {
+        y = (pageHeight - h) / 2;
+    }
+
+    pdf.addImage(imgData, 'PNG', x, y, w, h);
+    return pdf.output("blob");
 }
-
-pdf.addImage(imgData, 'PNG', x, y, w, h);
-
-
-    const blob = pdf.output("blob");
-    return blob;
-  }
 
 async function downloadPdf() {
   const blob = await makePdfBlob();
