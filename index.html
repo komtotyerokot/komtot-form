@@ -761,7 +761,8 @@ await new Promise(resolve => setTimeout(resolve, 100));
   }
 }
 
-    const imgData = canvasShot.toDataURL('image/jpeg', 0.8);
+    const imgData = canvasShot.toDataURL('image/png');
+
 
     const { jsPDF } = window.jspdf;
     // A4 portrait in mm
@@ -773,7 +774,26 @@ await new Promise(resolve => setTimeout(resolve, 100));
     const pageHeight = pdf.internal.pageSize.getHeight();
 
     // Fit image to A4
-    pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth, pageHeight);
+    const imgProps = pdf.getImageProperties(imgData);
+const imgW = pageWidth;
+const imgH = (imgProps.height * imgW) / imgProps.width;
+
+let x = 0;
+let y = 0;
+let w = imgW;
+let h = imgH;
+
+// אם הגובה יוצא יותר מהעמוד - נתאים לפי גובה
+if (h > pageHeight) {
+  h = pageHeight;
+  w = (imgProps.width * h) / imgProps.height;
+  x = (pageWidth - w) / 2;
+} else {
+  y = (pageHeight - h) / 2;
+}
+
+pdf.addImage(imgData, 'PNG', x, y, w, h);
+
 
     const blob = pdf.output("blob");
     return blob;
