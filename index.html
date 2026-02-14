@@ -333,11 +333,14 @@ button {
   const WHATSAPP_NUMBER = "972506274130";
 
   // ========== Helpers ==========
+ 
+function setStatus(msg, ok=true) {
   const statusBox = document.getElementById('statusBox');
-  function setStatus(msg, ok=true) {
-    statusBox.textContent = msg;
-    statusBox.className = "status " + (ok ? "ok" : "bad");
-  }
+  if (!statusBox) return; // אם האלמנט עוד לא קיים - לא מפילים את כל הסקריפט
+  statusBox.textContent = msg;
+  statusBox.className = "status " + (ok ? "ok" : "bad");
+}
+
 
   // Date helpers - show dd/mm/yyyy (instead of mm/dd/yyyy)
   function formatDateDMY(iso) {
@@ -389,9 +392,14 @@ button {
     ];
   }
 
-  function isSigEmpty() {
-    return signaturePad.isEmpty();
+function isSigEmpty() {
+  try {
+    return !window.signaturePad || !signaturePad || signaturePad.isEmpty();
+  } catch (e) {
+    return true;
   }
+}
+
 
 
 function canSubmit() {
@@ -418,6 +426,7 @@ function updateActionButtons() {
     if (isSigEmpty()) missing.push("חתימה");
     if (missing.length) {
       setStatus("חסרים שדות חובה: " + missing.join(", "), false);
+	  updateActionButtons();
       return false;
     }
     setStatus("כל השדות מולאו. אפשר להפיק PDF.", true);
@@ -555,10 +564,16 @@ function createPdfOverlay(paperEl){
     d.style.width = rect.width + 'px';
     d.style.height = rect.height + 'px';
 
-    d.style.display = 'block';
+    d.style.display = 'flex';
+d.style.alignItems = 'center';
     d.style.boxSizing = 'border-box';
     d.style.paddingRight = cs.paddingRight;
     d.style.paddingLeft = cs.paddingLeft;
+	d.style.paddingTop = cs.paddingTop;
+d.style.paddingBottom = cs.paddingBottom;
+d.style.textIndent = cs.textIndent;
+d.style.letterSpacing = cs.letterSpacing;
+
     d.style.fontFamily = cs.fontFamily;
     d.style.fontSize = cs.fontSize;
     d.style.fontWeight = cs.fontWeight;
@@ -640,12 +655,12 @@ function saveDraft(){
       }
     });
     // signature
-    if (window.signaturePad && typeof signaturePad !== 'undefined' && signaturePad && !signaturePad.isEmpty()){
-      sigDataUrl = signaturePad.toDataURL('image/png');
+if (window.signaturePad && typeof signaturePad !== 'undefined' && signaturePad && !signaturePad.isEmpty()){
+  data.__sig = signaturePad.toDataURL('image/png');
+} else {
+  data.__sig = null;
+}
 
-    } else {
-      data.__sig = null;
-    }
     sessionStorage.setItem('komotot_green_beret_draft_v2', JSON.stringify(data));
   }catch(e){}
 }
@@ -685,8 +700,9 @@ function restoreDraft(){
 // - when you open the file again (new session), it's empty
 // שמירה לפני מעבר לוואצפ/רקע, ושחזור כשחוזרים לטאב
 window.addEventListener('load', () => {
-  setTimeout(() => { /* do not auto-restore on fresh open */ }, 0);
+  try { restoreDraft(); } catch(e){}
 });
+
 
 document.addEventListener('input', () => { saveDraft(); }, true);
 document.addEventListener('change', () => { saveDraft(); }, true);
@@ -717,7 +733,8 @@ async function makePdfBlob() {
     let sigDataUrl = null;
     try {
         if (window.signaturePad && signaturePad && !signaturePad.isEmpty()) {
-            sigDataUrl = signaturePad.toDataURL('image/jpeg', 0.85);
+            sigDataUrl = signaturePad.toDataURL('image/png');
+
         }
     } catch(e) {}
 
@@ -781,33 +798,36 @@ if (h > pageHeight) {
 }
 
 pdf.addImage(imgData, 'JPEG', x, y, w, h);
-return pdf.output("blob");
+return pdf;
+
 
 }
 
 async function downloadPdf() {
-  const blob = await makePdfBlob();
-  if (!blob) return;
-  
-  const tzForFile = (document.getElementById('tz').value || '').trim().replace(/[^0-9]/g,'');
-  const fileName = `${tzForFile || 'ללא_תז'}_הצטרפות_כומתות_ירוקות.pdf`;
-  
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  
-  // Cleanup after a short delay
-  setTimeout(() => {
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    setStatus("ה-PDF ירד להורדות.", true);
-  }, 150);
+const res = await makePdfBlob();
+
+const blob =
+  (res instanceof Blob) ? res :
+  (res && typeof res.output === 'function') ? res.output('blob') :
+  null;
+
+if (!blob) {
+  setStatus("שגיאה ביצירת PDF", false);
+  return;
 }
 
-  document.getElementById('btnDownload').addEventListener('click', downloadPdf);
+
+  const tzForFile = (document.getElementById('tz').value || '')
+    .trim()
+    .replace(/[^0-9]/g,'');
+
+  const fileName = `${tzForFile || 'ללא_תז'}_הצטרפות_כומתות_ירוקות.pdf`;
+
+  pdf.save(fileName);
+  setStatus("ה-PDF ירד להורדות.", true);
+}
+
+document.getElementById('btnDownload').addEventListener('click', downloadPdf);
 
   
   // ========== WhatsApp ==========
@@ -853,8 +873,14 @@ async function sendWhatsApp() {
   // 3) Generate PDF and download it automatically so the user can attach it in WhatsApp
   setStatus("נפתח WhatsApp למספר הקבוע. עכשיו אני מכין ומוריד PDF - אחר כך ב-WhatsApp לחץ על סמל הצירוף (סיכה/+) ובחר את הקובץ האחרון שהורדת.", true);
 
-  const blob = await makePdfBlob();
-  if (!blob) return;
+const res = await makePdfBlob();
+const blob =
+  (res instanceof Blob) ? res :
+  (res && typeof res.output === 'function') ? res.output('blob') :
+  null;
+
+if (!blob) { setStatus("שגיאה ביצירת PDF", false); return; }
+
 
   const tzForFile = (document.getElementById('tz').value || '').trim().replace(/[^0-9]/g, '');
   const fileName = `${tzForFile || 'ללא_תז'}_הצטרפות_כומתות_ירוקות.pdf`;
@@ -898,8 +924,12 @@ async function sendWhatsApp() {
 
   setStatus("מכין ומוריד PDF. מיד לאחר מכן ייפתח מייל - יש לצרף ידנית את קובץ ה-PDF שהורד.", true);
 
-  const blob = await makePdfBlob();
-  if (!blob) return;
+const res = await makePdfBlob();
+const blob =
+  (res instanceof Blob) ? res :
+  (res && typeof res.output === 'function') ? res.output('blob') :
+  null;
+if (!blob) return;
 
   const tzForFile = (document.getElementById('tz').value || '').trim().replace(/[^0-9]/g, '');
   const fileName = `${tzForFile || 'ללא_תז'}_הצטרפות_כומתות_ירוקות.pdf`;
@@ -963,13 +993,28 @@ async function sendWhatsApp() {
 
 document.getElementById('btnSend').addEventListener('click', sendEmailWithPdf);
 // Init date field
-  setupDateField();
+ 
 
 // Live validation hints
   for (const [, el] of requiredFields()) {
     el.addEventListener('input', () => validateForm());
     el.addEventListener('change', () => validateForm());
   }
+  window.addEventListener('DOMContentLoaded', () => {
+  try {
+    setupDateField();
+  } catch(e){}
+
+  try {
+    initSignature();
+  } catch(e){}
+
+  try {
+    updateActionButtons();
+    validateForm();
+  } catch(e){}
+});
+
 </script>
 </body>
 </html>
