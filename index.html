@@ -431,10 +431,12 @@ function updateActionButtons() {
 
   const canvas = document.getElementById('sig');
   const sigHint = document.getElementById('sigHint');
-  const signaturePad = new SignaturePad(canvas, {
-    minWidth: 0.8,
-    maxWidth: 2.2,
-  });
+const signaturePad = new SignaturePad(canvas, {
+  minWidth: 0.8,
+  maxWidth: 2.2,
+});
+window.signaturePad = signaturePad;
+
 
 function resizeSigCanvas() {
   // Save signature data before resize
@@ -466,11 +468,13 @@ function resizeSigCanvas() {
     sigHint.style.display = "none";
   });
 
-  document.getElementById('btnClearSig').addEventListener('click', () => {
-    // removed (do not clear after actions)
-    sigHint.style.display = "flex";
-    setStatus("החתימה נוקתה.", true);
-  });
+document.getElementById('btnClearSig').addEventListener('click', () => {
+  signaturePad.clear();
+  sigHint.style.display = "flex";
+  updateActionButtons();
+  setStatus("החתימה נוקתה.", true);
+});
+
 
 // Enable/disable action buttons only when all required fields + signature are filled
 requiredFields().forEach(([, el]) => {
@@ -636,7 +640,8 @@ function saveDraft(){
     });
     // signature
     if (window.signaturePad && typeof signaturePad !== 'undefined' && signaturePad && !signaturePad.isEmpty()){
-      data.__sig = signaturePad.toDataURL('image/jpeg', 0.8);
+      sigDataUrl = signaturePad.toDataURL('image/png');
+
     } else {
       data.__sig = null;
     }
@@ -677,12 +682,27 @@ function restoreDraft(){
 // Start EMPTY every time you open the file fresh:
 // - sessionStorage persists only for the same tab/session (good for WhatsApp return)
 // - when you open the file again (new session), it's empty
-window.addEventListener('load', ()=>{ setTimeout(()=>{ /* do not auto-restore on fresh open */ }, 0); });
-document.addEventListener('input', ()=>{ saveDraft(); }, true);
-document.addEventListener('change', ()=>{ saveDraft(); }, true);
-document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') saveDraft(); 
-window.addEventListener('pageshow', ()=>{ try{ restoreDraft(); }catch(e){} });
+// שמירה לפני מעבר לוואצפ/רקע, ושחזור כשחוזרים לטאב
+window.addEventListener('load', () => {
+  setTimeout(() => { /* do not auto-restore on fresh open */ }, 0);
 });
+
+document.addEventListener('input', () => { saveDraft(); }, true);
+document.addEventListener('change', () => { saveDraft(); }, true);
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') saveDraft();
+});
+
+window.addEventListener('pageshow', () => {
+  try { 
+    restoreDraft(); 
+  } catch (e) {
+    console.error(e);
+  }
+});
+
+
 // ===================================================================
 
 async function makePdfBlob() {
@@ -709,37 +729,19 @@ async function makePdfBlob() {
     try {
         const cleanupOverlay = createPdfOverlay(paper);
         try {
-            canvasShot = await html2canvas(paper, {
-                scale: 2,  // ✅ תיקון 1: קבוע במקום חישוב שגורם טשטוש
-                useCORS: true,
-                backgroundColor: '#ffffff',
-                logging: false,
-                allowTaint: true,
-                foreignObjectRendering: false,
-                onclone: (clonedDoc) => {
-                    // ✅ תיקון 3: השתמש ב-sigDataUrl שנשמר מראש
-                    try {
-                        const cSig = clonedDoc.getElementById('sig');
-                        if (cSig && sigDataUrl) {
-                            const img = clonedDoc.createElement('img');
-                            img.src = sigDataUrl;
-                            img.alt = 'signature';
-                            img.style.width = '100%';
-                            img.style.height = '100%';
-                            img.style.display = 'block';
-                            img.style.objectFit = 'contain';
-                            cSig.replaceWith(img);
-                        }
-                    } catch(e) {}
+const isIphone = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+const dpr = Math.max(window.devicePixelRatio || 1, 1);
+const SCALE = isIphone ? Math.min(3, Math.ceil(dpr * 2)) : 4;
 
-                    const cHide = clonedDoc.getElementById('actionsInPaper');
-                    if (cHide) cHide.style.display = 'none';
-                    const cDatePicker = clonedDoc.getElementById('datePicker');
-                    if (cDatePicker) cDatePicker.style.display = 'none';
-                    const cDateIso = clonedDoc.getElementById('dateIso');
-                    if (cDateIso) cDateIso.style.display = 'none';
-                }
-            });
+canvasShot = await html2canvas(paper, {
+  scale: SCALE,
+  useCORS: true,
+  backgroundColor: '#ffffff',
+  imageTimeout: 0,
+  removeContainer: true
+});
+
+
         } finally {
             cleanupOverlay();
         }
@@ -747,9 +749,17 @@ async function makePdfBlob() {
         if (hideEl) hideEl.style.display = "flex";
     }
 
-    const imgData = canvasShot.toDataURL('image/png');
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4", compress: true });
+const imgData = canvasShot.toDataURL('image/jpeg', 0.9);
+pdf.addImage(imgData, 'JPEG', x, y, w, h);
+
+
+const { jsPDF } = window.jspdf;
+const pdf = new jsPDF({
+  orientation: "portrait",
+  unit: "px",
+  format: [canvasShot.width, canvasShot.height],
+  compress: true
+});
 
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
