@@ -2,10 +2,9 @@
 <html lang="he" dir="rtl">
 <head>
   <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes"/>
   <meta name="mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
   <title>טופס הצטרפות לעמותת הכומתות הירוקות</title>
 
   <!-- Libraries (CDN) -->
@@ -96,6 +95,8 @@ button {
     .paper {
       position: relative;
       width: 100%;
+      max-width: 953px;
+      margin: 0 auto;
       background: #fff;
       border-radius: 14px;
       box-shadow: 0 8px 20px rgba(0,0,0,.08);
@@ -225,28 +226,21 @@ button {
   }
   .paper {
     margin: 10px auto 180px auto;
+    max-width: 100%;
   }
   body {
     padding: 10px;
   }
   /* שיפור שדות למובייל */
   .field input, .field textarea {
-    font-size: 16px !important;  /* מונע זום אוטומטי באייפון */
+    font-size: 16px !important;
     padding: 6px 8px;
     -webkit-appearance: none;
-    -webkit-tap-highlight-color: transparent;
   }
   
   .field input::placeholder, .field textarea::placeholder {
     font-size: 14px;
     opacity: 0.6;
-  }
-  
-  /* שיפור חתימה למובייל */
-  canvas#sig {
-    touch-action: none;
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
   }
 }
   
@@ -451,42 +445,21 @@ function updateActionButtons() {
     console.error('SignaturePad library not loaded');
   }
 
-  // פונקציית זיהוי מכשיר ופלטפורמה
-  function initSignature() {
-    const canvas = document.getElementById('sig');
-    const sigHint = document.getElementById('sigHint');
-    
-    // זיהוי סוג מכשיר
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    const isAndroid = /Android/.test(navigator.userAgent);
-    const isMobile = isIOS || isAndroid;
-    
-    const signaturePad = new SignaturePad(canvas, {
-      minWidth: isMobile ? 0.3 : 0.5,
-      maxWidth: isMobile ? 2.0 : 2.5,
-      throttle: isMobile ? 16 : 8,
-      velocityFilterWeight: 0.7,
-      penColor: 'rgb(0, 0, 0)'
-    });
-    window.signaturePad = signaturePad;
-    
-    return { canvas, sigHint, signaturePad, isMobile };
-  }
-  
-  const { canvas, sigHint, signaturePad, isMobile } = initSignature();
+  const canvas = document.getElementById('sig');
+  const sigHint = document.getElementById('sigHint');
+const signaturePad = new SignaturePad(canvas, {
+  minWidth: 0.8,
+  maxWidth: 2.2,
+});
+window.signaturePad = signaturePad;
 
 
 function resizeSigCanvas() {
   // Save signature data before resize
-  let sigData = null;
-  try {
-    if (!signaturePad.isEmpty()) {
-      sigData = signaturePad.toData();
-    }
-  } catch(e) {}
+  const sigData = signaturePad.toData();
   
-  // Keep drawing crisp on high DPI - שיפור לכל המכשירים
-  const ratio = Math.max(window.devicePixelRatio || 1, 2);  // מינימום 2 לאיכות טובה
+  // Keep drawing crisp on high DPI
+  const ratio = Math.max(window.devicePixelRatio || 1, 1);
   const rect = canvas.getBoundingClientRect();
   canvas.width = Math.max(1, Math.floor(rect.width * ratio));
   canvas.height = Math.max(1, Math.floor(rect.height * ratio));
@@ -495,12 +468,8 @@ function resizeSigCanvas() {
 
   // Restore signature after resize
   if (sigData && sigData.length > 0) {
-    try {
-      signaturePad.fromData(sigData);
-      sigHint.style.display = "none";
-    } catch(e) {
-      sigHint.style.display = "flex";
-    }
+    signaturePad.fromData(sigData);
+    sigHint.style.display = "none";
   } else {
     sigHint.style.display = "flex";
   }
@@ -509,9 +478,6 @@ function resizeSigCanvas() {
 }
 
   window.addEventListener('resize', resizeSigCanvas);
-  window.addEventListener('orientationchange', () => {
-    setTimeout(resizeSigCanvas, 100);
-  });
   setTimeout(resizeSigCanvas, 50);
 
   canvas.addEventListener('pointerdown', () => {
@@ -788,23 +754,22 @@ async function makePdfBlob() {
     try {
         const cleanupOverlay = createPdfOverlay(paper);
         try {
-// שיפור: סקייל גבוה יותר לכל הפלטפורמות לאיכות מקסימלית
 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-const SCALE = isMobile ? 3 : 4;  // הגדלת הסקייל לאיכות טובה יותר
+const SCALE = isMobile ? 3 : 4;
 
 
 canvasShot = await html2canvas(paper, {
   scale: SCALE,
   useCORS: true,
-  allowTaint: true,
   backgroundColor: '#ffffff',
   imageTimeout: 0,
   removeContainer: true,
-  logging: false,
-  width: paper.scrollWidth,
-  height: paper.scrollHeight,
-  windowWidth: paper.scrollWidth,
-  windowHeight: paper.scrollHeight
+  width: 953,
+  height: 1334,
+  windowWidth: 953,
+  windowHeight: 1334,
+  x: 0,
+  y: 0
 });
 
 
@@ -818,7 +783,6 @@ canvasShot = await html2canvas(paper, {
 
 
 const { jsPDF } = window.jspdf;
-// שיפור: שימוש בגודל A4 סטנדרטי במקום גודל דינמי
 const pdf = new jsPDF({
   orientation: "portrait",
   unit: "mm",
@@ -827,28 +791,22 @@ const pdf = new jsPDF({
 });
 
 
-// שיפור: איכות JPEG גבוהה יותר
 const imgData = canvasShot.toDataURL('image/jpeg', 0.95);
 
-// שיפור: התאמה מלאה לעמוד A4
 const pageWidth = pdf.internal.pageSize.getWidth();
 const pageHeight = pdf.internal.pageSize.getHeight();
 
-// חישוב יחס גובה-רוחב של התמונה
+// חישוב להתאמה מלאה לעמוד A4
 const imgAspect = canvasShot.width / canvasShot.height;
 const pageAspect = pageWidth / pageHeight;
 
 let w, h, x, y;
-
-// התאמה כך שהתמונה תמלא את כל העמוד
 if (imgAspect > pageAspect) {
-  // התמונה רחבה יותר - התאם לגובה
   h = pageHeight;
   w = h * imgAspect;
   x = (pageWidth - w) / 2;
   y = 0;
 } else {
-  // התמונה גבוהה יותר - התאם לרוחב
   w = pageWidth;
   h = w / imgAspect;
   x = 0;
@@ -881,7 +839,6 @@ try {
   
   const fileName = `${tzForFile || 'ללא_תז'}_הצטרפות_כומתות_ירוקות.pdf`;
   
-  // שיפור: שימוש ב-URL.createObjectURL להורדה אמינה יותר
   const blobUrl = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = blobUrl;
@@ -1075,40 +1032,20 @@ document.getElementById('btnSend').addEventListener('click', sendEmailWithPdf);
     el.addEventListener('input', () => validateForm());
     el.addEventListener('change', () => validateForm());
   }
-  
-  // אתחול מלא של הטופס
   window.addEventListener('DOMContentLoaded', () => {
-    try {
-      setupDateField();
-    } catch(e) {
-      console.error('Error setting up date field:', e);
-    }
+  try {
+    setupDateField();
+  } catch(e){}
 
-    try {
-      // חתימה כבר אותחלה למעלה, רק צריך resize
-      resizeSigCanvas();
-    } catch(e) {
-      console.error('Error resizing signature canvas:', e);
-    }
+  try {
+    initSignature();
+  } catch(e){}
 
-    try {
-      updateActionButtons();
-      validateForm();
-    } catch(e) {
-      console.error('Error in validation:', e);
-    }
-    
-    // שיפור למובייל: מניעת zoom בעת מיקוד בשדות
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    if (isMobile) {
-      document.querySelectorAll('input, textarea').forEach(el => {
-        el.addEventListener('focus', function() {
-          this.style.fontSize = '16px';
-        });
-      });
-    }
-  });
-
+  try {
+    updateActionButtons();
+    validateForm();
+  } catch(e){}
+});
 
 </script>
 </body>
