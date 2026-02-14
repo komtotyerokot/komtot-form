@@ -602,7 +602,8 @@ function createPdfOverlay(paperEl){
 
   return function cleanup(){
     controls.forEach(el => {
-      if (el.id === 'datePicker') {
+	if (el.tagName === 'CANVAS') return;
+      if (el.id === 'datePicker' || el.id === 'dateIso') {
         el.style.visibility = el.dataset.__prevVisibility || '';
         delete el.dataset.__prevVisibility;
         return;
@@ -729,9 +730,9 @@ async function makePdfBlob() {
     try {
         const cleanupOverlay = createPdfOverlay(paper);
         try {
-const isIphone = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-const dpr = Math.max(window.devicePixelRatio || 1, 1);
-const SCALE = isIphone ? Math.min(3, Math.ceil(dpr * 2)) : 4;
+const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+const SCALE = isMobile ? 2 : 3;
+
 
 canvasShot = await html2canvas(paper, {
   scale: SCALE,
@@ -749,8 +750,6 @@ canvasShot = await html2canvas(paper, {
         if (hideEl) hideEl.style.display = "flex";
     }
 
-const imgData = canvasShot.toDataURL('image/jpeg', 0.9);
-pdf.addImage(imgData, 'JPEG', x, y, w, h);
 
 
 const { jsPDF } = window.jspdf;
@@ -761,25 +760,29 @@ const pdf = new jsPDF({
   compress: true
 });
 
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const imgProps = pdf.getImageProperties(imgData);
 
-    const imgW = pageWidth;
-    const imgH = (imgProps.height * imgW) / imgProps.width;
+const imgData = canvasShot.toDataURL('image/jpeg', 0.9);
 
-    let x = 0, y = 0, w = imgW, h = imgH;
+const pageWidth = pdf.internal.pageSize.getWidth();
+const pageHeight = pdf.internal.pageSize.getHeight();
+const imgProps = pdf.getImageProperties(imgData);
 
-    if (h > pageHeight) {
-        h = pageHeight;
-        w = (imgProps.width * h) / imgProps.height;
-        x = (pageWidth - w) / 2;
-    } else {
-        y = (pageHeight - h) / 2;
-    }
+let w = pageWidth;
+let h = (imgProps.height * w) / imgProps.width;
 
-    pdf.addImage(imgData, 'PNG', x, y, w, h);
-    return pdf.output("blob");
+let x = 0, y = 0;
+
+if (h > pageHeight) {
+  h = pageHeight;
+  w = (imgProps.width * h) / imgProps.height;
+  x = (pageWidth - w) / 2;
+} else {
+  y = (pageHeight - h) / 2;
+}
+
+pdf.addImage(imgData, 'JPEG', x, y, w, h);
+return pdf.output("blob");
+
 }
 
 async function downloadPdf() {
