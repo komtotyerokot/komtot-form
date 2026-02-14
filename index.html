@@ -735,6 +735,22 @@ async function makePdfBlob() {
     setStatus("מכין PDF...", true);
 
     const paper = document.getElementById('paperInner');
+    const paperContainer = document.getElementById('paper');
+
+    // ✅ שמירת גודל מקורי ואכיפת יחס נכון
+    const originalContainerStyle = {
+      width: paperContainer.style.width,
+      maxWidth: paperContainer.style.maxWidth,
+      margin: paperContainer.style.margin
+    };
+    
+    // כפיית גודל אופטימלי לצילום (953px רוחב, יחס 1.4:1)
+    paperContainer.style.width = '953px';
+    paperContainer.style.maxWidth = '953px';
+    paperContainer.style.margin = '0 auto';
+    
+    // המתנה שה-DOM יתעדכן
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // ✅ תיקון 3: שמור dataURL של החתימה לפני כל שינוי
     let sigDataUrl = null;
@@ -749,7 +765,7 @@ async function makePdfBlob() {
     const hideEl = document.getElementById("actionsInPaper");
     if (hideEl) hideEl.style.display = "none";
 
-    await new Promise(resolve => setTimeout(resolve, 150));
+    await new Promise(resolve => setTimeout(resolve, 50));
 
     try {
         const cleanupOverlay = createPdfOverlay(paper);
@@ -761,15 +777,11 @@ const SCALE = isMobile ? 3 : 4;
 canvasShot = await html2canvas(paper, {
   scale: SCALE,
   useCORS: true,
+  allowTaint: true,
   backgroundColor: '#ffffff',
   imageTimeout: 0,
   removeContainer: true,
-  width: 953,
-  height: 1334,
-  windowWidth: 953,
-  windowHeight: 1334,
-  x: 0,
-  y: 0
+  logging: false
 });
 
 
@@ -778,6 +790,11 @@ canvasShot = await html2canvas(paper, {
         }
     } finally {
         if (hideEl) hideEl.style.display = "flex";
+        
+        // ✅ שחזור הגודל המקורי
+        paperContainer.style.width = originalContainerStyle.width;
+        paperContainer.style.maxWidth = originalContainerStyle.maxWidth;
+        paperContainer.style.margin = originalContainerStyle.margin;
     }
 
 
