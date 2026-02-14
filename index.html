@@ -2,8 +2,7 @@
 <html lang="he" dir="rtl">
 <head>
   <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>טופס הצטרפות לעמותת הכומתות הירוקות</title>
 
   <!-- Libraries (CDN) -->
@@ -13,16 +12,6 @@
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
   <style>
-  
-
-
-/* תיקון כללי למניעת זום אוטומטי באייפון שמסתיר כפתורים */
-input[type="date"], 
-input[type="text"], 
-input[type="number"] {
-  font-size: 16px !important; 
-}
-
     :root {
       --green: #1b6b3a;
       --border: rgba(27,107,58,.55);
@@ -172,36 +161,24 @@ button {
       background: rgba(255,255,255,.72);
       border-radius: 6px;
       padding: 6px 8px;
-	  min-height: 25px;
     }
 
     /* Signature */
-.sigbox {
-  width: 100%;
-  height: 100%;
-  min-height: 55px;
-  border: 2px solid var(--border);
-  border-radius: 10px;
-  background: rgba(255,255,255,.9);
-  position: relative;
-  overflow: hidden;          /* ← חזרה ל-hidden */
-  display: block;
-}
-canvas#sig {
-  position: absolute;        /* ← שינוי קריטי */
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-  touch-action: none;
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  user-select: none;
-  cursor: crosshair;
-  z-index: 2;
-}
-
+    .sigbox {
+      width:100%;
+      height:100%;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      background: rgba(255,255,255,.9);
+      position: relative;
+      overflow:hidden;
+    }
+    canvas#sig {
+      width: 100%;
+      height: 100%;
+      display:block;
+      touch-action: none;
+    }
     .sighint {
       position:absolute;
       inset:0;
@@ -265,46 +242,6 @@ canvas#sig {
   
     /* הסתרה זמנית בזמן יצירת PDF */
     .hide-for-pdf{display:none !important;}
-	
-@media screen and (orientation: landscape) {
-    /* נותן לשדה התאריך "מרחב נשימה" */
-    .datewrap {
-        height: 60px !important; 
-        min-height: 60px !important;
-        background: #fff !important;
-        border: 1px solid #ccc !important;
-        border-radius: 8px;
-        z-index: 10000;
-    }
-    
-    input[type="date"] {
-        font-size: 16px !important;
-        height: 100% !important;
-        width: 100% !important;
-    }
-}
-
-// תיקון לאייפון במצב לרוחב - מביא את התאריך למרכז
-const dateField = document.getElementById('date');
-if (dateField) {
-    dateField.addEventListener('click', function() {
-        setTimeout(() => {
-            this.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 300);
-    });
-}
-@media (orientation: landscape) {
-  input[type="date"] {
-    position: relative;
-    z-index: 9999;
-  }
-}
-/* כשהתאריך פתוח באייפון - מסתירים את כפתורי הפעולות כדי שלא יכסו את ה-✓ */
-body.date-open .actions-inpaper{
-  display: none !important;
-}
-
-
 </style>
 </head>
 
@@ -365,17 +302,18 @@ body.date-open .actions-inpaper{
 		
 
         <!-- Signature + Date -->
-        <div class="field" style="left: 34.2%; top: 94.8%; width: 38%; height: 4.8%; min-height: 55px; overflow: visible;">
-<div class="sigbox" style="position:relative; width:100%; height:100%; min-height:55px; display:block; overflow:visible;">
-  <canvas id="sig" style="position:absolute; top:0; left:0; width:100%; height:100%; touch-action:none; -webkit-user-select:none; user-select:none; display:block; cursor:crosshair;"></canvas>
-  <div class="sighint" id="sigHint" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; display:flex; align-items:center; justify-content:center;">חתימה דיגיטלית</div>
-</div>
+        <div class="field" style="left: 34.2%; top: 94.8%; width: 38%; height: 4.8%;">
+          <div class="sigbox">
+            <canvas id="sig"></canvas>
+            <div class="sighint" id="sigHint">חתימה דיגיטלית</div>
+          </div>
         </div>
 
-<div class="field slim datewrap" style="left: 74%; top: 96.5%; width: 21%; height: 2.8%; display: flex; align-items: center;">
-  <input id="date" type="date" required 
-         style="width: 100%; height: 100%; border: none; background: transparent; font-size: 14px; color: #000; -webkit-appearance: listbox; display: block; min-height: 30px;">
-</div>
+        <div class="field slim datewrap" style="left: 74%; top: 96.5%; width: 21%; height: 2.8%;">
+          <input id="date" type="text" placeholder="תאריך" readonly required>
+          <input id="datePicker" type="date" tabindex="-1" aria-hidden="true">
+          <input id="dateIso" type="hidden">
+        </div>
 
       </div>
     </div>
@@ -384,7 +322,6 @@ body.date-open .actions-inpaper{
   </div>
 
 <script>
-alert('JS התחיל');
   // ========== EmailJS CONFIG ==========
   // כדי להפעיל שליחה במייל דרך EmailJS:
   // 1) פתח חשבון EmailJS, צור Service ו-Template
@@ -456,8 +393,8 @@ alert('JS התחיל');
   }
 
   function isSigEmpty() {
-  return !signaturePad || signaturePad.isEmpty();
-}
+    return signaturePad.isEmpty();
+  }
 
 
 function canSubmit() {
@@ -490,136 +427,65 @@ function updateActionButtons() {
     return true;
   }
 
-// ========== Signature Pad ==========
-if (typeof SignaturePad === 'undefined') {
-  console.error('SignaturePad library not loaded');
-}
-
-const canvas = document.getElementById('sig');
-const sigHint = document.getElementById('sigHint');
-
-let signaturePad = null;
-
-// Critical CSS for iOS - must be set before SignaturePad init
-if (canvas) {
-  canvas.style.touchAction = 'none';
-  canvas.style.msTouchAction = 'none';
-  canvas.style.userSelect = 'none';
-  canvas.style.webkitUserSelect = 'none';
-  canvas.style.webkitTouchCallout = 'none';
-}
-
-// Prevent page scroll while signing (iOS)
-const stopScroll = (e) => { e.preventDefault(); };
-
-// End-of-draw handler (some iOS builds skip pointer events sometimes)
-const handleDrawEnd = () => {
-  if (sigHint) sigHint.style.display = 'none';
-  setTimeout(updateActionButtons, 80);
-};
-
-function attachSigEvents(){
-  if (!canvas) return;
-
-  canvas.addEventListener('touchstart', stopScroll, { passive: false });
-  canvas.addEventListener('touchmove',  stopScroll, { passive: false });
-  canvas.addEventListener('touchend',   stopScroll, { passive: false });
-
-  canvas.addEventListener('pointerdown',  () => { if (sigHint) sigHint.style.display = 'none'; });
-  canvas.addEventListener('pointerup',    handleDrawEnd);
-  canvas.addEventListener('pointercancel',handleDrawEnd);
-  canvas.addEventListener('pointerleave', handleDrawEnd);
-
-  // Fallback for iOS
-  canvas.addEventListener('touchend',    handleDrawEnd, { passive: true });
-  canvas.addEventListener('touchcancel', handleDrawEnd, { passive: true });
-}
-
-// Resize signature canvas safely (iOS can report 0 size on first paint)
-function resizeSigCanvas() {
-  if (!canvas || !signaturePad) return;
-
-  const ratio = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
-
-  // If iOS still did not layout the element, retry shortly
-  if (canvas.offsetWidth === 0 || canvas.offsetHeight === 0) {
-    // Ensure it has a minimum visible height
-    canvas.style.height = '55px';
-    if (canvas.parentElement) canvas.parentElement.style.height = '55px';
-    if (canvas.parentElement && canvas.parentElement.parentElement) {
-      canvas.parentElement.parentElement.style.minHeight = '55px';
-    }
-    setTimeout(resizeSigCanvas, 150);
-    return;
+  // ========== Signature Pad ==========
+  if (typeof SignaturePad === 'undefined') {
+    console.error('SignaturePad library not loaded');
   }
 
-  const wasEmpty = signaturePad.isEmpty();
-  const data = signaturePad.toData();
-
-  canvas.width  = Math.round(canvas.offsetWidth  * ratio);
-  canvas.height = Math.round(canvas.offsetHeight * ratio);
-
-  const ctx = canvas.getContext('2d');
-  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-
-  if (!wasEmpty && data && data.length > 0) {
-    signaturePad.fromData(data);
-  } else {
-    signaturePad.clear();
-  }
-
-  updateActionButtons();
-}
-
-function initSignature() {
-  if (!canvas) return;
-
-  // If iOS gives 0 size, wait for layout then init
-  if (canvas.offsetWidth === 0 || canvas.offsetHeight === 0) {
-    setTimeout(initSignature, 150);
-    return;
-  }
-
-  signaturePad = new SignaturePad(canvas, {
+  const canvas = document.getElementById('sig');
+  const sigHint = document.getElementById('sigHint');
+  const signaturePad = new SignaturePad(canvas, {
     minWidth: 0.8,
     maxWidth: 2.2,
-    backgroundColor: 'rgba(0,0,0,0)',
   });
 
-  attachSigEvents();
-  resizeSigCanvas();
+function resizeSigCanvas() {
+  // Save signature data before resize
+  const sigData = signaturePad.toData();
+  
+  // Keep drawing crisp on high DPI
+  const ratio = Math.max(window.devicePixelRatio || 1, 1);
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = Math.max(1, Math.floor(rect.width * ratio));
+  canvas.height = Math.max(1, Math.floor(rect.height * ratio));
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+
+  // Restore signature after resize
+  if (sigData && sigData.length > 0) {
+    signaturePad.fromData(sigData);
+    sigHint.style.display = "none";
+  } else {
+    sigHint.style.display = "flex";
+  }
+  
+  updateActionButtons();
 }
 
-// Init after full load (more reliable on iPhone Safari)
-window.addEventListener('load', () => {
-  setTimeout(initSignature, 300);
-});
+  window.addEventListener('resize', resizeSigCanvas);
+  setTimeout(resizeSigCanvas, 50);
 
-// Also handle returning to the tab and orientation changes (iOS)
-window.addEventListener('pageshow', () => {
-  if (signaturePad) setTimeout(resizeSigCanvas, 250);
-});
-window.addEventListener('resize', () => {
-  if (signaturePad) setTimeout(resizeSigCanvas, 250);
-});
-window.addEventListener('orientationchange', () => {
-  if (signaturePad) setTimeout(resizeSigCanvas, 350);
-});
+  canvas.addEventListener('pointerdown', () => {
+    sigHint.style.display = "none";
+  });
 
-// ========== Clear ==========
-document.getElementById('btnClearSig').addEventListener('click', () => {
-  signaturePad.clear();
-  if (sigHint) sigHint.style.display = 'flex';
-  setStatus('החתימה נוקתה.', true);
-  updateActionButtons();
-});
+  document.getElementById('btnClearSig').addEventListener('click', () => {
+    // removed (do not clear after actions)
+    sigHint.style.display = "flex";
+    setStatus("החתימה נוקתה.", true);
+  });
 
-// ========== שדות נדרשים ==========
+// Enable/disable action buttons only when all required fields + signature are filled
 requiredFields().forEach(([, el]) => {
-  el.addEventListener('input',  updateActionButtons);
+  el.addEventListener('input', updateActionButtons);
   el.addEventListener('change', updateActionButtons);
 });
+canvas.addEventListener('pointerup', updateActionButtons);
+canvas.addEventListener('pointercancel', updateActionButtons);
+canvas.addEventListener('pointerleave', updateActionButtons);
 updateActionButtons();
+
+
 
   // ========== PDF Generation ==========
 // ================= PDF + Mobile reliability helpers (no long-term changes) =================
@@ -803,7 +669,7 @@ function restoreDraft(){
       if(tag==='textarea') el.textContent = el.value || '';
     });
 
-    if (data.__sig && typeof signaturePad !== 'undefined' && signaturePad){
+    if (data.__sig && window.signaturePad && typeof signaturePad !== 'undefined' && signaturePad){
       try{
         signaturePad.fromDataURL(data.__sig);
       }catch(e){}
@@ -817,14 +683,9 @@ function restoreDraft(){
 window.addEventListener('load', ()=>{ setTimeout(()=>{ /* do not auto-restore on fresh open */ }, 0); });
 document.addEventListener('input', ()=>{ saveDraft(); }, true);
 document.addEventListener('change', ()=>{ saveDraft(); }, true);
-// ✅ מתוקן — pageshow בחוץ
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') saveDraft();
-});
-window.addEventListener('pageshow', () => {
-  try { restoreDraft(); } catch(e) {}
-});
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') saveDraft(); 
 window.addEventListener('pageshow', ()=>{ try{ restoreDraft(); }catch(e){} });
+});
 // ===================================================================
 
 async function makePdfBlob() {
@@ -865,7 +726,7 @@ await new Promise(resolve => setTimeout(resolve, 100));
             // Signature as image in clone (extra reliability)
             try {
               const cSig = clonedDoc.getElementById('sig');
-              if (cSig && typeof signaturePad !== 'undefined' && signaturePad && !signaturePad.isEmpty()) {
+              if (cSig && window.signaturePad && !signaturePad.isEmpty()) {
                 const dataUrl = signaturePad.toDataURL('image/jpeg', 0.8);
                 const img = clonedDoc.createElement('img');
                 img.src = dataUrl;
@@ -894,7 +755,7 @@ await new Promise(resolve => setTimeout(resolve, 100));
   }
 }
 
-const imgData = canvasShot.toDataURL('image/jpeg', 0.8);
+    const imgData = canvasShot.toDataURL('image/jpeg', 0.8);
 
     const { jsPDF } = window.jspdf;
     // A4 portrait in mm
@@ -925,7 +786,6 @@ async function downloadPdf() {
   a.download = fileName;
   document.body.appendChild(a);
   a.click();
-  alert("הקובץ נוצר! באייפון הוא נשמר בדרך כלל באפליקציית 'קבצים'. מיד ייפתח המייל - נא לצרף אותו משם.");
   
   // Cleanup after a short delay
   setTimeout(() => {
@@ -937,20 +797,6 @@ async function downloadPdf() {
 
   document.getElementById('btnDownload').addEventListener('click', downloadPdf);
 
-setTimeout(() => {
-  const canvas = document.getElementById('sig');
-  const box = canvas.parentElement;
-  const field = box.parentElement;
-  
-  console.log('=== DEBUG ===');
-  console.log('canvas offsetWidth:', canvas.offsetWidth);
-  console.log('canvas offsetHeight:', canvas.offsetHeight);
-  console.log('canvas.width:', canvas.width);
-  console.log('canvas.height:', canvas.height);
-  console.log('sigbox offsetHeight:', box.offsetHeight);
-  console.log('field offsetHeight:', field.offsetHeight);
-  console.log('canvas getBoundingClientRect:', JSON.stringify(canvas.getBoundingClientRect()));
-}, 500);
   
   // ========== WhatsApp ==========
   function buildWhatsAppText() {
@@ -1008,7 +854,6 @@ async function sendWhatsApp() {
   a.style.display = 'none';
   document.body.appendChild(a);
   a.click();
-  alert("הקובץ נוצר! באייפון הוא נשמר בדרך כלל באפליקציית 'קבצים'. מיד ייפתח המייל - נא לצרף אותו משם.");
 
   setTimeout(() => {
     document.body.removeChild(a);
@@ -1113,30 +958,6 @@ document.getElementById('btnSend').addEventListener('click', sendEmailWithPdf);
     el.addEventListener('input', () => validateForm());
     el.addEventListener('change', () => validateForm());
   }
-  const dateInput2 = document.getElementById('date');
-if (dateInput2) {
-  const open = () => document.body.classList.add('date-open');
-  const close = () => document.body.classList.remove('date-open');
-
-  dateInput2.addEventListener('focus', open);
-  dateInput2.addEventListener('click', open);
-  dateInput2.addEventListener('change', close);
-  dateInput2.addEventListener('blur', close);
-}
-
-// ========== DEBUG iOS - הוסף זמנית ==========
-canvas.addEventListener('touchstart', (e) => {
-  console.log('TOUCH START', e.touches[0].clientX, e.touches[0].clientY);
-  // אם זה מופיע בקונסול — ה-touch מגיע ל-canvas
-  // אם לא — משהו מעל מחסום אותו
-}, { passive: false });
-
-// בדיקה אם הקנבס בכלל קיים ונגיש
-console.log('Canvas element:', canvas);
-console.log('Canvas size:', canvas.offsetWidth, 'x', canvas.offsetHeight);
-console.log('Canvas bounding rect:', canvas.getBoundingClientRect());
-
 </script>
-
 </body>
 </html>
