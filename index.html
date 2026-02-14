@@ -302,6 +302,7 @@ button {
         <div class="field" style="left: 34.2%; top: 94.8%; width: 38%; height: 4.8%;">
           <div class="sigbox">
             <canvas id="sig"></canvas>
+            <img id="sigPreview" style="display:none; position:absolute; inset:0; width:100%; height:100%; pointer-events:none;">
             <div class="sighint" id="sigHint">חתימה דיגיטלית</div>
           </div>
         </div>
@@ -729,14 +730,34 @@ async function makePdfBlob() {
 
     const paper = document.getElementById('paperInner');
 
-    // ✅ תיקון 3: שמור dataURL של החתימה לפני כל שינוי
+    // העתקת חתימה מ-canvas ל-img לתצוגה ב-PDF
+    const sigCanvas = document.getElementById('sig');
+    const sigPreview = document.getElementById('sigPreview');
     let sigDataUrl = null;
+    
     try {
         if (window.signaturePad && signaturePad && !signaturePad.isEmpty()) {
             sigDataUrl = signaturePad.toDataURL('image/png');
-
+            if (sigPreview) {
+                sigPreview.src = sigDataUrl;
+                sigPreview.style.display = 'block';
+            }
+            // הסתרת canvas בזמן רינדור
+            if (sigCanvas) {
+                sigCanvas.style.opacity = '0';
+            }
+            
+            // המתנה לטעינת התמונה
+            if (sigPreview && !sigPreview.complete) {
+                await new Promise(resolve => {
+                    sigPreview.onload = resolve;
+                    setTimeout(resolve, 500); // fallback
+                });
+            }
         }
-    } catch(e) {}
+    } catch(e) {
+        console.error('Signature error:', e);
+    }
 
     let canvasShot;
     const hideEl = document.getElementById("actionsInPaper");
@@ -747,8 +768,7 @@ async function makePdfBlob() {
     try {
         const cleanupOverlay = createPdfOverlay(paper);
         try {
-const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-const SCALE = isMobile ? 2 : 3;
+const SCALE = 3;
 
 
 canvasShot = await html2canvas(paper, {
@@ -765,6 +785,9 @@ canvasShot = await html2canvas(paper, {
         }
     } finally {
         if (hideEl) hideEl.style.display = "flex";
+        // שחזור canvas
+        if (sigCanvas) sigCanvas.style.opacity = '1';
+        if (sigPreview) sigPreview.style.display = 'none';
     }
 
 
@@ -778,7 +801,7 @@ const pdf = new jsPDF({
 });
 
 
-const imgData = canvasShot.toDataURL('image/jpeg', 0.9);
+const imgData = canvasShot.toDataURL('image/jpeg', 0.98);
 
 const pageWidth = pdf.internal.pageSize.getWidth();
 const pageHeight = pdf.internal.pageSize.getHeight();
@@ -823,7 +846,20 @@ if (!blob) {
 
   const fileName = `${tzForFile || 'ללא_תז'}_הצטרפות_כומתות_ירוקות.pdf`;
 
-  pdf.save(fileName);
+  // תיקון: שימוש ב-Blob API במקום pdf.save() שלא עובד טוב במחשב
+  const blobUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = blobUrl;
+  a.download = fileName;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(blobUrl);
+  }, 300);
+
   setStatus("ה-PDF ירד להורדות.", true);
 }
 
