@@ -735,55 +735,61 @@ async function makePdfBlob() {
     setStatus("מכין PDF...", true);
 
     const paper = document.getElementById('paperInner');
-    const paperContainer = document.getElementById('paper');
 
-    // ✅ שמירת גודל מקורי ואכיפת יחס נכון
-    const originalContainerStyle = {
-      width: paperContainer.style.width,
-      maxWidth: paperContainer.style.maxWidth,
-      margin: paperContainer.style.margin
-    };
-    
-    // כפיית גודל אופטימלי לצילום (953px רוחב, יחס 1.4:1)
-    paperContainer.style.width = '953px';
-    paperContainer.style.maxWidth = '953px';
-    paperContainer.style.margin = '0 auto';
-    
-    // המתנה שה-DOM יתעדכן
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    // ✅ תיקון 3: שמור dataURL של החתימה לפני כל שינוי
-    let sigDataUrl = null;
+    // שמור את החתימה ואת גודל ה-canvas המקורי
+    let sigData = null;
+    const sigCanvas = document.getElementById('signatureCanvas');
     try {
         if (window.signaturePad && signaturePad && !signaturePad.isEmpty()) {
-            sigDataUrl = signaturePad.toDataURL('image/png');
-
+            sigData = signaturePad.toData(); // שומר את הנקודות, לא רק תמונה
         }
     } catch(e) {}
+
+    // שמור את רוחב המסך הנוכחי
+    const currentViewportWidth = window.innerWidth;
+    const needsViewportFix = currentViewportWidth < 953;
+    
+    // אם המסך צר מדי, זמני שנה viewport למידה קבועה
+    if (needsViewportFix) {
+        const viewport = document.querySelector('meta[name="viewport"]');
+        const originalViewport = viewport.content;
+        viewport.content = 'width=953, initial-scale=1';
+        
+        // חכה שהדפדפן יתאים את הלייאאוט
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        // צייר מחדש את החתימה בגודל הנכון
+        if (sigData && signaturePad) {
+            signaturePad.clear();
+            signaturePad.fromData(sigData);
+        }
+    }
 
     let canvasShot;
     const hideEl = document.getElementById("actionsInPaper");
     if (hideEl) hideEl.style.display = "none";
 
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise(resolve => setTimeout(resolve, 150));
 
     try {
         const cleanupOverlay = createPdfOverlay(paper);
         try {
-const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-const SCALE = isMobile ? 3 : 4;
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            const SCALE = isMobile ? 3 : 4;
 
-
-canvasShot = await html2canvas(paper, {
-  scale: SCALE,
-  useCORS: true,
-  allowTaint: true,
-  backgroundColor: '#ffffff',
-  imageTimeout: 0,
-  removeContainer: true,
-  logging: false
-});
-
+            canvasShot = await html2canvas(paper, {
+              scale: SCALE,
+              useCORS: true,
+              backgroundColor: '#ffffff',
+              imageTimeout: 0,
+              removeContainer: true,
+              width: 953,
+              height: 1334,
+              windowWidth: 953,
+              windowHeight: 1334,
+              x: 0,
+              y: 0
+            });
 
         } finally {
             cleanupOverlay();
@@ -791,49 +797,52 @@ canvasShot = await html2canvas(paper, {
     } finally {
         if (hideEl) hideEl.style.display = "flex";
         
-        // ✅ שחזור הגודל המקורי
-        paperContainer.style.width = originalContainerStyle.width;
-        paperContainer.style.maxWidth = originalContainerStyle.maxWidth;
-        paperContainer.style.margin = originalContainerStyle.margin;
+        // שחזר את ה-viewport המקורי
+        if (needsViewportFix) {
+            const viewport = document.querySelector('meta[name="viewport"]');
+            viewport.content = 'width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes';
+            
+            // חכה ושחזר את החתימה למצב המקורי
+            await new Promise(resolve => setTimeout(resolve, 200));
+            if (sigData && signaturePad) {
+                signaturePad.clear();
+                signaturePad.fromData(sigData);
+            }
+        }
     }
 
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+      compress: true
+    });
 
+    const imgData = canvasShot.toDataURL('image/jpeg', 0.95);
 
-const { jsPDF } = window.jspdf;
-const pdf = new jsPDF({
-  orientation: "portrait",
-  unit: "mm",
-  format: "a4",
-  compress: true
-});
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
 
+    // חישוב להתאמה מלאה לעמוד A4
+    const imgAspect = canvasShot.width / canvasShot.height;
+    const pageAspect = pageWidth / pageHeight;
 
-const imgData = canvasShot.toDataURL('image/jpeg', 0.95);
+    let w, h, x, y;
+    if (imgAspect > pageAspect) {
+      h = pageHeight;
+      w = h * imgAspect;
+      x = (pageWidth - w) / 2;
+      y = 0;
+    } else {
+      w = pageWidth;
+      h = w / imgAspect;
+      x = 0;
+      y = (pageHeight - h) / 2;
+    }
 
-const pageWidth = pdf.internal.pageSize.getWidth();
-const pageHeight = pdf.internal.pageSize.getHeight();
-
-// חישוב להתאמה מלאה לעמוד A4
-const imgAspect = canvasShot.width / canvasShot.height;
-const pageAspect = pageWidth / pageHeight;
-
-let w, h, x, y;
-if (imgAspect > pageAspect) {
-  h = pageHeight;
-  w = h * imgAspect;
-  x = (pageWidth - w) / 2;
-  y = 0;
-} else {
-  w = pageWidth;
-  h = w / imgAspect;
-  x = 0;
-  y = (pageHeight - h) / 2;
-}
-
-pdf.addImage(imgData, 'JPEG', x, y, w, h, undefined, 'FAST');
-return pdf;
-
-
+    pdf.addImage(imgData, 'JPEG', x, y, w, h, undefined, 'FAST');
+    return pdf;
 }
 
 async function downloadPdf() {
